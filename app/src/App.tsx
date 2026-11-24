@@ -21,6 +21,12 @@ function shuffle<T>(items: T[]) {
   return copy
 }
 
+function getQuestionOptions(question: Question) {
+  return question.type === 'true-false'
+    ? ['True', 'False']
+    : shuffle(question.options)
+}
+
 const mixedHistoryKey = 'inf234-mixed-question-history'
 
 function readMixedHistory(): string[][] {
@@ -80,7 +86,7 @@ function App() {
     }
     setAttempts(picked.map((question) => ({
       question,
-      options: shuffle(question.options),
+      options: getQuestionOptions(question),
       selected: null,
       correct: false,
     })))
@@ -170,7 +176,7 @@ function App() {
                   className={`flex min-h-16 items-center gap-4 rounded-xl border-2 px-4 text-left transition ${border}`}
                 >
                   <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black ${isSelected ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>
-                    {attempt.question.type === 'true-false' ? (optionIndex === 0 ? 'T' : 'F') : String.fromCharCode(65 + optionIndex)}
+                    {attempt.question.type === 'true-false' ? (option === 'True' ? 'T' : 'F') : String.fromCharCode(65 + optionIndex)}
                   </span>
                   <span className="font-bold">{option}</span>
                 </button>
