@@ -21,6 +21,27 @@ function shuffle<T>(items: T[]) {
   return copy
 }
 
+const mixedHistoryKey = 'inf234-mixed-question-history'
+
+function readMixedHistory(): string[][] {
+  try {
+    const stored = sessionStorage.getItem(mixedHistoryKey)
+    const history = stored ? JSON.parse(stored) : []
+    return Array.isArray(history) ? history.slice(-3) : []
+  } catch {
+    return []
+  }
+}
+
+function rememberMixedQuiz(ids: string[]) {
+  try {
+    const history = [...readMixedHistory(), ids].slice(-3)
+    sessionStorage.setItem(mixedHistoryKey, JSON.stringify(history))
+  } catch {
+    // Quiz shuffling still works when browser storage is unavailable.
+  }
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('setup')
   const [mode, setMode] = useState<'mixed' | 'category'>('mixed')
@@ -44,9 +65,19 @@ function App() {
       pool = pool.filter((q) => q[categoryKind] === chosen)
     }
 
-    const picked = mode === 'category'
-      ? shuffle(pool).slice(0, Math.min(10, pool.length))
-      : pool.slice(0, Math.min(10, pool.length))
+    let picked: Question[]
+    if (mode === 'category' && categoryKind === 'topic') {
+      picked = shuffle(pool)
+    } else if (mode === 'category') {
+      picked = shuffle(pool).slice(0, Math.min(10, pool.length))
+    } else {
+      const history = readMixedHistory()
+      const recentlyUsed = new Set(history.flat())
+      const freshPool = pool.filter((question) => !recentlyUsed.has(question.id))
+      const selectionPool = freshPool.length >= 10 ? freshPool : pool
+      picked = shuffle(selectionPool).slice(0, Math.min(10, selectionPool.length))
+      rememberMixedQuiz(picked.map((question) => question.id))
+    }
     setAttempts(picked.map((question) => ({
       question,
       options: shuffle(question.options),
@@ -201,6 +232,9 @@ function App() {
   }
 
   const chosenCategory = category || (categoryKind === 'section' ? sections[0] : topics[0])
+  const topicQuizCount = categoryKind === 'topic'
+    ? questions.filter((question) => question.topic === chosenCategory).length
+    : 0
 
   return (
     <main className="min-h-screen bg-[#0b1020] text-slate-100">
@@ -222,7 +256,7 @@ function App() {
           >
             <span className="text-3xl">⚡</span>
             <h2 className="mt-5 text-xl font-black">Mixed exam</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">A 10-question short exam mixing sections and topics in source exam order.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-400">A random 10-question short exam mixing sections and topics.</p>
           </button>
           <button
             onClick={() => setMode('category')}
@@ -289,7 +323,9 @@ function App() {
           onClick={startQuiz}
           className="mt-5 w-full rounded-2xl bg-cyan-400 px-6 py-4 text-lg font-black text-slate-950 hover:bg-cyan-300"
         >
-          Start 10-question quiz →
+          {mode === 'category' && categoryKind === 'topic'
+            ? `Start topic quiz (${topicQuizCount} questions) →`
+            : 'Start 10-question quiz →'}
         </button>
       </div>
     </main>
