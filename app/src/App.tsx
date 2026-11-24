@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { questions } from './questions'
 import type { Question } from './types'
 
@@ -15,6 +15,128 @@ interface Attempt {
 interface EndlessProgress {
   queue: string[]
   streaks: Record<string, number>
+}
+
+interface CustomSelectProps {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  accent: 'cyan' | 'violet'
+  label: string
+}
+
+function CustomSelect({ value, options, onChange, accent, label }: CustomSelectProps) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const focusIndex = options.indexOf(value)
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open])
+
+  const focusBorder = accent === 'cyan' ? 'focus:border-cyan-400' : 'focus:border-violet-400'
+
+  return (
+    <div ref={rootRef} className="relative mt-2">
+      <button
+        type="button"
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
+        className={`flex w-full items-center justify-between rounded-xl border border-slate-700 bg-[#0b1020] px-4 py-3 text-left text-white outline-none ${focusBorder}`}
+      >
+        <span>{value}</span>
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M5 7.5 10 12l5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-700 bg-[#111729] p-1 shadow-2xl"
+        >
+          {options.map((option, index) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={option === value}
+              key={option}
+              onClick={() => {
+                onChange(option)
+                setOpen(false)
+              }}
+              className={`w-full rounded-lg px-3 py-2 text-left text-sm font-bold transition ${
+                option === value
+                  ? accent === 'cyan'
+                    ? 'bg-cyan-400/15 text-cyan-300'
+                    : 'bg-violet-400/15 text-violet-300'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              tabIndex={index === focusIndex ? 0 : -1}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ConfirmDialogProps {
+  open: boolean
+  title: string
+  description: string
+  confirmLabel: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function ConfirmDialog({ open, title, description, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
+  useEffect(() => {
+    if (!open) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [open, onCancel])
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-5" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onCancel()
+    }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#13192a] p-6 shadow-2xl">
+        <h2 id="confirm-title" className="text-xl font-black text-white">{title}</h2>
+        <p id="confirm-description" className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onCancel} className="rounded-xl border border-slate-600 px-4 py-2.5 font-black text-slate-300 hover:border-slate-400 hover:text-white">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} className="rounded-xl bg-rose-500 px-4 py-2.5 font-black text-white hover:bg-rose-400">
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function shuffle<T>(items: T[]) {
@@ -100,6 +222,8 @@ function App() {
   const [endlessCurrentId, setEndlessCurrentId] = useState<string | null>(null)
   const [endlessAnswered, setEndlessAnswered] = useState(false)
   const [endlessCorrect, setEndlessCorrect] = useState(false)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [openReviews, setOpenReviews] = useState<string[]>([])
 
   const sections = useMemo(() => [...new Set(questions.map((q) => q.section))].sort(), [])
   const topics = useMemo(() => [...new Set(questions.map((q) => q.topic))].sort(), [])
@@ -261,11 +385,10 @@ function App() {
   }
 
   const resetEndlessProgress = () => {
-    if (!window.confirm('Reset all endless mode progress? This cannot be undone.')) return
-
     const progress = { queue: questions.map((question) => question.id), streaks: {} }
     setEndlessProgress(progress)
     saveEndlessProgress(progress)
+    setResetConfirmOpen(false)
   }
 
   if (screen === 'quiz') {
@@ -494,21 +617,34 @@ function App() {
 
           <h2 className="mb-4 mt-8 text-xl font-black">Review answers</h2>
           <div className="space-y-3">
-            {attempts.map((attempt, i) => (
-              <details key={attempt.question.id} className="rounded-xl border border-slate-800 bg-[#13192a] p-4">
-                <summary className="cursor-pointer list-none">
-                  <div className="flex items-start gap-3">
-                    <span className={`mt-0.5 h-3 w-3 shrink-0 rounded-full ${attempt.correct ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                    <span className="font-bold">{i + 1}. {attempt.question.prompt}</span>
-                  </div>
-                </summary>
-                <div className="mt-4 border-t border-slate-800 pt-4 text-sm">
+            {attempts.map((attempt, i) => {
+              const reviewOpen = openReviews.includes(attempt.question.id)
+              return (
+              <div key={attempt.question.id} className="overflow-hidden rounded-xl border border-slate-800 bg-[#13192a]">
+                <button
+                  type="button"
+                  aria-expanded={reviewOpen}
+                  onClick={() => {
+                    setOpenReviews((current) => reviewOpen
+                      ? current.filter((id) => id !== attempt.question.id)
+                      : [...current, attempt.question.id])
+                  }}
+                  className="flex w-full items-start gap-3 p-4 text-left"
+                >
+                  <span className={`mt-0.5 h-3 w-3 shrink-0 rounded-full ${attempt.correct ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                  <span className="flex-1 font-bold">{i + 1}. {attempt.question.prompt}</span>
+                  <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className={`mt-0.5 h-4 w-4 shrink-0 transition-transform ${reviewOpen ? 'rotate-180' : ''}`}>
+                    <path d="M5 7.5 10 12l5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {reviewOpen && <div className="mx-4 border-t border-slate-800 py-4 text-sm">
                   <p><span className="font-bold text-slate-400">Your answer:</span> {attempt.selected ?? 'No answer'}</p>
                   <p className="mt-1"><span className="font-bold text-emerald-300">Correct answer:</span> {attempt.question.answer}</p>
                   <p className="mt-3 leading-6 text-slate-300">{attempt.question.explanation}</p>
-                </div>
-              </details>
-            ))}
+                </div>}
+              </div>
+              )
+            })}
           </div>
           <button onClick={startQuiz} className="mt-6 rounded-xl bg-violet-500 px-6 py-3 font-black text-white">Try another 10</button>
         </section>
@@ -522,6 +658,7 @@ function App() {
     : 0
 
   return (
+    <>
     <main className="min-h-screen bg-[#0b1020] text-slate-100">
       <div className="mx-auto max-w-6xl px-5 py-8 md:py-14">
         <header className="mb-10 flex items-center justify-between">
@@ -563,51 +700,44 @@ function App() {
 
         {mode === 'mixed' && (
           <section className="mt-5 rounded-2xl border border-slate-800 bg-[#13192a] p-5">
-            <label className="text-sm font-bold text-slate-300">
-              Exam order
-              <select
-                value={mixedExam}
-                onChange={(event) => setMixedExam(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1020] px-4 py-3 text-white outline-none focus:border-cyan-400"
-              >
-                {exams.map((exam) => (
-                  <option key={exam} value={exam}>{exam}</option>
-                ))}
-              </select>
-            </label>
+            <span className="text-sm font-bold text-slate-300">Exam order</span>
+            <CustomSelect
+              value={mixedExam}
+              options={exams}
+              onChange={setMixedExam}
+              accent="cyan"
+              label="Exam order"
+            />
           </section>
         )}
 
         {mode === 'category' && (
           <section className="mt-5 rounded-2xl border border-slate-800 bg-[#13192a] p-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-bold text-slate-300">
-                Category type
-                <select
-                  value={categoryKind}
-                  onChange={(event) => {
-                    const kind = event.target.value as CategoryKind
+              <div>
+                <span className="text-sm font-bold text-slate-300">Category type</span>
+                <CustomSelect
+                  value={categoryKind === 'section' ? 'Exam section' : 'Topic'}
+                  options={['Exam section', 'Topic']}
+                  onChange={(value) => {
+                    const kind = value === 'Topic' ? 'topic' : 'section'
                     setCategoryKind(kind)
                     setCategory(kind === 'section' ? sections[0] : topics[0])
                   }}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1020] px-4 py-3 text-white outline-none focus:border-violet-400"
-                >
-                  <option value="section">Exam section</option>
-                  <option value="topic">Topic</option>
-                </select>
-              </label>
-              <label className="text-sm font-bold text-slate-300">
-                Category
-                <select
+                  accent="violet"
+                  label="Category type"
+                />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-slate-300">Category</span>
+                <CustomSelect
                   value={chosenCategory}
-                  onChange={(event) => setCategory(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1020] px-4 py-3 text-white outline-none focus:border-violet-400"
-                >
-                  {(categoryKind === 'section' ? sections : topics).map((item) => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
+                  options={categoryKind === 'section' ? sections : topics}
+                  onChange={setCategory}
+                  accent="violet"
+                  label="Category"
+                />
+              </div>
             </div>
           </section>
         )}
@@ -622,7 +752,7 @@ function App() {
                   <div className="flex items-center justify-between gap-4">
                     <p className="text-sm font-bold text-slate-300">Progress: {cleared} / {questions.length} cleared</p>
                     <button
-                      onClick={resetEndlessProgress}
+                      onClick={() => setResetConfirmOpen(true)}
                       className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-black text-slate-300 hover:border-rose-400 hover:text-rose-300"
                     >
                       Reset progress
@@ -649,6 +779,15 @@ function App() {
         </button>
       </div>
     </main>
+    <ConfirmDialog
+      open={resetConfirmOpen}
+      title="Reset endless progress?"
+      description="This will clear every cleared question and streak. This cannot be undone."
+      confirmLabel="Reset progress"
+      onConfirm={resetEndlessProgress}
+      onCancel={() => setResetConfirmOpen(false)}
+    />
+    </>
   )
 }
 
