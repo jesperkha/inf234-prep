@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { questions } from './questions'
 import type { Question } from './types'
 
-type Screen = 'setup' | 'quiz' | 'results'
+type Screen = 'setup' | 'quiz' | 'results' | 'endless-complete'
 type CategoryKind = 'section' | 'topic'
 
 interface Attempt {
@@ -10,6 +10,11 @@ interface Attempt {
   options: string[]
   selected: string | null
   correct: boolean
+}
+
+interface EndlessProgress {
+  queue: string[]
+  streaks: Record<string, number>
 }
 
 function shuffle<T>(items: T[]) {
@@ -21,6 +26,16 @@ function shuffle<T>(items: T[]) {
   return copy
 }
 
+function requeueRandomly(queue: string[], id: string) {
+  const remaining = queue.filter((item) => item !== id)
+  const position = Math.floor(Math.random() * (remaining.length + 1))
+  return [
+    ...remaining.slice(0, position),
+    id,
+    ...remaining.slice(position),
+  ]
+}
+
 function getQuestionOptions(question: Question) {
   return question.type === 'true-false'
     ? ['True', 'False']
@@ -28,6 +43,7 @@ function getQuestionOptions(question: Question) {
 }
 
 const mixedHistoryKey = 'inf234-mixed-question-history'
+const endlessProgressKey = 'inf234-endless-progress'
 
 function readMixedHistory(): string[][] {
   try {
@@ -48,21 +64,66 @@ function rememberMixedQuiz(ids: string[]) {
   }
 }
 
+function readEndlessProgress(): EndlessProgress {
+  try {
+    const stored = localStorage.getItem(endlessProgressKey)
+    if (stored) {
+      const progress = JSON.parse(stored) as EndlessProgress
+      if (Array.isArray(progress.queue) && progress.streaks) {
+        return progress
+      }
+    }
+  } catch {
+    // Endless progress still works when browser storage is unavailable.
+  }
+  return { queue: questions.map((question) => question.id), streaks: {} }
+}
+
+function saveEndlessProgress(progress: EndlessProgress) {
+  try {
+    localStorage.setItem(endlessProgressKey, JSON.stringify(progress))
+  } catch {
+    // Endless progress still works when browser storage is unavailable.
+  }
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('setup')
-  const [mode, setMode] = useState<'mixed' | 'category'>('mixed')
+  const [mode, setMode] = useState<'mixed' | 'category' | 'endless'>('mixed')
   const [categoryKind, setCategoryKind] = useState<CategoryKind>('section')
   const [category, setCategory] = useState('')
   const [mixedExam, setMixedExam] = useState('All exams')
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
+  const [endlessProgress, setEndlessProgress] = useState<EndlessProgress>(readEndlessProgress)
+  const [endlessCurrentId, setEndlessCurrentId] = useState<string | null>(null)
+  const [endlessAnswered, setEndlessAnswered] = useState(false)
+  const [endlessCorrect, setEndlessCorrect] = useState(false)
 
   const sections = useMemo(() => [...new Set(questions.map((q) => q.section))].sort(), [])
   const topics = useMemo(() => [...new Set(questions.map((q) => q.topic))].sort(), [])
   const exams = useMemo(() => ['All exams', ...[...new Set(questions.map((q) => q.exam))].sort()], [])
 
   const startQuiz = () => {
+    if (mode === 'endless') {
+      const startingQueue = endlessProgress.queue.length > 0
+        ? shuffle(endlessProgress.queue)
+        : shuffle(questions.map((question) => question.id))
+      const startingStreaks = endlessProgress.queue.length > 0
+        ? endlessProgress.streaks
+        : {}
+      const progress = { queue: startingQueue, streaks: startingStreaks }
+      setEndlessProgress(progress)
+      saveEndlessProgress(progress)
+      setEndlessCurrentId(startingQueue[0] ?? null)
+      setEndlessAnswered(false)
+      setEndlessCorrect(false)
+      setSelected(null)
+      setScreen('quiz')
+      return
+    }
+
     let pool = [...questions]
     if (mode === 'mixed' && mixedExam !== 'All exams') {
       pool = pool.filter((q) => q.exam === mixedExam)
@@ -97,6 +158,29 @@ function App() {
 
   const confirmAnswer = () => {
     if (!selected) return
+
+    if (mode === 'endless') {
+      const questionId = endlessCurrentId
+      if (!questionId) return
+      const question = questions.find((item) => item.id === questionId)
+      if (!question) return
+
+      const correct = selected === question.answer
+      const streak = correct ? (endlessProgress.streaks[questionId] ?? 0) + 1 : 0
+      const queue = streak >= 2
+        ? endlessProgress.queue.filter((id) => id !== questionId)
+        : endlessProgress.queue
+      const streaks = { ...endlessProgress.streaks, [questionId]: streak }
+      if (streak >= 2) delete streaks[questionId]
+
+      const progress = { queue, streaks }
+      setEndlessProgress(progress)
+      saveEndlessProgress(progress)
+      setEndlessCorrect(correct)
+      setEndlessAnswered(true)
+      return
+    }
+
     setAttempts((current) => current.map((attempt, i) =>
       i === index
         ? {...attempt, selected, correct: selected === attempt.question.answer}
@@ -105,6 +189,33 @@ function App() {
   }
 
   const nextQuestion = () => {
+    if (mode === 'endless') {
+      const currentId = endlessCurrentId
+      if (!currentId) return
+      const queue = endlessProgress.queue.includes(currentId)
+        ? requeueRandomly(endlessProgress.queue, currentId)
+        : endlessProgress.queue
+      const nextQueue = queue
+
+      if (nextQueue.length === 0) {
+        const progress = { queue: [], streaks: endlessProgress.streaks }
+        setEndlessProgress(progress)
+        saveEndlessProgress(progress)
+        setScreen('endless-complete')
+        return
+      }
+
+      const progress = { ...endlessProgress, queue: nextQueue }
+      setEndlessProgress(progress)
+      saveEndlessProgress(progress)
+      const nextIndex = Math.floor(Math.random() * nextQueue.length)
+      setEndlessCurrentId(nextQueue[nextIndex])
+      setSelected(null)
+      setEndlessAnswered(false)
+      setEndlessCorrect(false)
+      return
+    }
+
     if (index >= attempts.length - 1) {
       setScreen('results')
     } else {
@@ -114,6 +225,25 @@ function App() {
   }
 
   const skipQuestion = () => {
+    if (mode === 'endless') {
+      const questionId = endlessCurrentId
+      if (!questionId) return
+      const streak = (endlessProgress.streaks[questionId] ?? 0) + 1
+      const queue = streak >= 2
+        ? endlessProgress.queue.filter((id) => id !== questionId)
+        : endlessProgress.queue
+      const streaks = { ...endlessProgress.streaks, [questionId]: streak }
+      if (streak >= 2) delete streaks[questionId]
+
+      const progress = { queue, streaks }
+      setEndlessProgress(progress)
+      saveEndlessProgress(progress)
+      setEndlessCorrect(false)
+      setEndlessAnswered(true)
+      setSelected(null)
+      return
+    }
+
     setAttempts((current) => current.map((attempt, i) =>
       i === index
         ? { ...attempt, selected: null, correct: false }
@@ -126,10 +256,118 @@ function App() {
     setScreen('setup')
     setAttempts([])
     setIndex(0)
+    setEndlessCurrentId(null)
     setSelected(null)
   }
 
+  const resetEndlessProgress = () => {
+    if (!window.confirm('Reset all endless mode progress? This cannot be undone.')) return
+
+    const progress = { queue: questions.map((question) => question.id), streaks: {} }
+    setEndlessProgress(progress)
+    saveEndlessProgress(progress)
+  }
+
   if (screen === 'quiz') {
+    if (mode === 'endless') {
+      const questionId = endlessCurrentId
+      if (!questionId) return null
+      const question = questions.find((item) => item.id === questionId)
+      if (!question) {
+        return null
+      }
+
+      const options = getQuestionOptions(question)
+      const completedCount = questions.length - endlessProgress.queue.length
+      const progress = (completedCount / questions.length) * 100
+      const streak = endlessProgress.streaks[questionId] ?? 0
+
+      return (
+        <main className="min-h-screen bg-[#0b1020] text-slate-100">
+          <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
+            <button onClick={restart} className="text-sm font-bold text-slate-400 hover:text-white">← Exit quiz</button>
+            <span className="text-xs font-bold text-slate-400">{completedCount} / {questions.length} cleared</span>
+          </header>
+          <div className="h-1 bg-[#171e33]" role="progressbar" aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={completedCount}>
+            <div className="h-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} />
+          </div>
+
+          <section className="mx-auto max-w-3xl px-5 py-10 md:py-16">
+            <div className="mb-5 flex flex-wrap gap-2">
+              <span className="rounded-full bg-violet-500/15 px-3 py-1 text-xs font-bold text-violet-300">{question.topic}</span>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-300">{question.exam} exam · {question.section}</span>
+              {streak > 0 && <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">{streak}/2 correct in a row</span>}
+            </div>
+            <h1 className={`text-2xl font-black leading-tight text-white md:text-4xl ${question.description ? '' : 'mb-12'}`}>
+              {question.prompt}
+            </h1>
+            {question.description && (
+              <p className="mt-4 mb-8 whitespace-pre-wrap rounded-xl border border-slate-700 bg-[#111729] p-4 text-base leading-7 text-slate-300">
+                {question.description}
+              </p>
+            )}
+
+            <div className="grid gap-3">
+              {options.map((option, optionIndex) => {
+                const isSelected = selected === option
+                let border = 'border-slate-700 bg-[#151b2d] hover:border-cyan-400'
+                if (endlessAnswered && option === question.answer) border = 'border-emerald-400 bg-emerald-400/10'
+                if (endlessAnswered && isSelected && !endlessCorrect) border = 'border-rose-400 bg-rose-400/10'
+                if (!endlessAnswered && isSelected) border = 'border-cyan-400 bg-cyan-400/10'
+
+                return (
+                  <button
+                    key={option}
+                    disabled={endlessAnswered}
+                    onClick={() => setSelected(option)}
+                    className={`flex min-h-16 items-center gap-4 rounded-xl border-2 px-4 text-left transition ${border}`}
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black ${isSelected ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>
+                      {question.type === 'true-false' ? (option === 'True' ? 'T' : 'F') : String.fromCharCode(65 + optionIndex)}
+                    </span>
+                    <span className="font-bold">{option}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {endlessAnswered && (
+              <div className={`mt-6 rounded-xl border p-4 ${endlessCorrect ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-rose-400/40 bg-rose-400/10'}`}>
+                <p className={`font-black ${endlessCorrect ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {endlessCorrect ? 'Correct' : `Answer: ${question.answer}`}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-300">{question.explanation}</p>
+              </div>
+            )}
+
+            <div className="mt-8 flex justify-end gap-3">
+              {!endlessAnswered ? (
+                <>
+                  <button
+                    onClick={skipQuestion}
+                    className="rounded-xl border border-slate-600 px-5 py-3 font-black text-slate-300 hover:border-slate-400 hover:text-white"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    disabled={!selected}
+                    onClick={confirmAnswer}
+                    className="rounded-xl bg-cyan-400 px-6 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Check answer
+                  </button>
+                </>
+              ) : (
+                <button onClick={nextQuestion} className="rounded-xl bg-violet-500 px-6 py-3 font-black text-white">
+                  {endlessProgress.queue.length === 0 ? 'Finish' : 'Next question'} →
+                </button>
+              )}
+            </div>
+          </section>
+        </main>
+      )
+    }
+
     const attempt = attempts[index]
     const answered = attempt.selected !== null
     const progress = ((index + 1) / attempts.length) * 100
@@ -221,6 +459,23 @@ function App() {
     )
   }
 
+  if (screen === 'endless-complete') {
+    return (
+      <main className="min-h-screen bg-[#0b1020] px-5 py-10 text-slate-100">
+        <section className="mx-auto max-w-3xl rounded-2xl border border-slate-800 bg-[#13192a] p-8 text-center">
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-300">Endless mode complete</p>
+          <h1 className="mt-3 text-4xl font-black text-white">All {questions.length} questions cleared</h1>
+          <div className="mt-8 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={questions.length}>
+            <div className="h-full w-full bg-cyan-400" />
+          </div>
+          <button onClick={restart} className="mt-8 rounded-xl bg-cyan-400 px-6 py-3 font-black text-slate-950">
+            Back to setup
+          </button>
+        </section>
+      </main>
+    )
+  }
+
   if (screen === 'results') {
     const correct = attempts.filter((attempt) => attempt.correct).length
     const percentage = Math.round((correct / attempts.length) * 100)
@@ -279,7 +534,7 @@ function App() {
           </div>
         </header>
 
-        <section className="grid gap-5 md:grid-cols-2">
+        <section className="grid gap-5 md:grid-cols-3">
           <button
             onClick={() => setMode('mixed')}
             className={`rounded-2xl border-2 p-6 text-left transition ${mode === 'mixed' ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-800 bg-[#13192a] hover:border-slate-600'}`}
@@ -295,6 +550,14 @@ function App() {
             <span className="text-3xl">◫</span>
             <h2 className="mt-5 text-xl font-black">Practice by category</h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">Focus on one official exam section or one algorithm topic.</p>
+          </button>
+          <button
+            onClick={() => setMode('endless')}
+            className={`rounded-2xl border-2 p-6 text-left transition ${mode === 'endless' ? 'border-emerald-400 bg-emerald-400/10' : 'border-slate-800 bg-[#13192a] hover:border-slate-600'}`}
+          >
+            <span className="text-3xl">∞</span>
+            <h2 className="mt-5 text-xl font-black">Endless mode</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">Clear every question by answering it correctly twice in a row.</p>
           </button>
         </section>
 
@@ -349,11 +612,38 @@ function App() {
           </section>
         )}
 
+        {mode === 'endless' && (
+          <section className="mt-5 rounded-2xl border border-slate-800 bg-[#13192a] p-5">
+            {(() => {
+              const cleared = questions.length - endlessProgress.queue.length
+              const progress = (cleared / questions.length) * 100
+              return (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-sm font-bold text-slate-300">Progress: {cleared} / {questions.length} cleared</p>
+                    <button
+                      onClick={resetEndlessProgress}
+                      className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-black text-slate-300 hover:border-rose-400 hover:text-rose-300"
+                    >
+                      Reset progress
+                    </button>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={cleared}>
+                    <div className="h-full bg-cyan-400 transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </>
+              )
+            })()}
+          </section>
+        )}
+
         <button
           onClick={startQuiz}
           className="mt-5 w-full rounded-2xl bg-cyan-400 px-6 py-4 text-lg font-black text-slate-950 hover:bg-cyan-300"
         >
-          {mode === 'category' && categoryKind === 'topic'
+          {mode === 'endless'
+            ? `Start endless mode (${endlessProgress.queue.length} remaining) →`
+            : mode === 'category' && categoryKind === 'topic'
             ? `Start topic quiz (${topicQuizCount} questions) →`
             : 'Start 10-question quiz →'}
         </button>
