@@ -220,6 +220,7 @@ function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [endlessProgress, setEndlessProgress] = useState<EndlessProgress>(readEndlessProgress)
   const [endlessCurrentId, setEndlessCurrentId] = useState<string | null>(null)
+  const [endlessOptions, setEndlessOptions] = useState<string[]>([])
   const [endlessAnswered, setEndlessAnswered] = useState(false)
   const [endlessCorrect, setEndlessCorrect] = useState(false)
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
@@ -240,7 +241,10 @@ function App() {
       const progress = { queue: startingQueue, streaks: startingStreaks }
       setEndlessProgress(progress)
       saveEndlessProgress(progress)
-      setEndlessCurrentId(startingQueue[0] ?? null)
+      const startingId = startingQueue[0] ?? null
+      const startingQuestion = questions.find((question) => question.id === startingId)
+      setEndlessCurrentId(startingId)
+      setEndlessOptions(startingQuestion ? getQuestionOptions(startingQuestion) : [])
       setEndlessAnswered(false)
       setEndlessCorrect(false)
       setSelected(null)
@@ -333,7 +337,10 @@ function App() {
       setEndlessProgress(progress)
       saveEndlessProgress(progress)
       const nextIndex = Math.floor(Math.random() * nextQueue.length)
-      setEndlessCurrentId(nextQueue[nextIndex])
+      const nextId = nextQueue[nextIndex]
+      const nextQuestion = questions.find((question) => question.id === nextId)
+      setEndlessCurrentId(nextId)
+      setEndlessOptions(nextQuestion ? getQuestionOptions(nextQuestion) : [])
       setSelected(null)
       setEndlessAnswered(false)
       setEndlessCorrect(false)
@@ -381,6 +388,7 @@ function App() {
     setAttempts([])
     setIndex(0)
     setEndlessCurrentId(null)
+    setEndlessOptions([])
     setSelected(null)
   }
 
@@ -400,7 +408,7 @@ function App() {
         return null
       }
 
-      const options = getQuestionOptions(question)
+      const options = endlessOptions
       const completedCount = questions.length - endlessProgress.queue.length
       const progress = (completedCount / questions.length) * 100
       const streak = endlessProgress.streaks[questionId] ?? 0
