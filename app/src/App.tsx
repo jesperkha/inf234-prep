@@ -107,6 +107,15 @@ function App() {
     }
   }
 
+  const skipQuestion = () => {
+    setAttempts((current) => current.map((attempt, i) =>
+      i === index
+        ? { ...attempt, selected: null, correct: false }
+        : attempt,
+    ))
+    nextQuestion()
+  }
+
   const restart = () => {
     setScreen('setup')
     setAttempts([])
@@ -178,15 +187,23 @@ function App() {
             </div>
           )}
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-end gap-3">
             {!answered ? (
-              <button
-                disabled={!selected}
-                onClick={confirmAnswer}
-                className="rounded-xl bg-cyan-400 px-6 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Check answer
-              </button>
+              <>
+                <button
+                  onClick={skipQuestion}
+                  className="rounded-xl border border-slate-600 px-5 py-3 font-black text-slate-300 hover:border-slate-400 hover:text-white"
+                >
+                  Skip
+                </button>
+                <button
+                  disabled={!selected}
+                  onClick={confirmAnswer}
+                  className="rounded-xl bg-cyan-400 px-6 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Check answer
+                </button>
+              </>
             ) : (
               <button onClick={nextQuestion} className="rounded-xl bg-violet-500 px-6 py-3 font-black text-white">
                 {index === attempts.length - 1 ? 'See results' : 'Next question'} →
