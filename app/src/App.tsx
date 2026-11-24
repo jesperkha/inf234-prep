@@ -136,7 +136,14 @@ function App() {
             <span className="rounded-full bg-violet-500/15 px-3 py-1 text-xs font-bold text-violet-300">{attempt.question.topic}</span>
             <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-bold text-slate-300">{attempt.question.exam} exam · {attempt.question.section}</span>
           </div>
-          <h1 className="mb-8 text-2xl font-black leading-tight text-white md:text-4xl">{attempt.question.prompt}</h1>
+          <h1 className={`text-2xl font-black leading-tight text-white md:text-4xl ${attempt.question.description ? '' : 'mb-12'}`}>
+            {attempt.question.prompt}
+          </h1>
+          {attempt.question.description && (
+            <p className="mt-4 mb-8 whitespace-pre-wrap rounded-xl border border-slate-700 bg-[#111729] p-4 text-base leading-7 text-slate-300">
+              {attempt.question.description}
+            </p>
+          )}
 
           <div className="grid gap-3">
             {attempt.options.map((option, optionIndex) => {

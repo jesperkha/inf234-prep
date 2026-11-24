@@ -1,6 +1,6 @@
 import type { Question } from './types'
 
-export const questions: Question[] = [
+const baseQuestions: Question[] = [
   {id:'24-tf-1',exam:'2024',section:'True or false',topic:'Stable matching',prompt:'The running time of the Gale–Shapley algorithm for stable matching is linear in the size of the input.',type:'true-false',options:['True','False'],answer:'True',explanation:'The solution manual states that Gale–Shapley is linear in the size of the input.'},
   {id:'24-tf-2',exam:'2024',section:'True or false',topic:'Stable matching',prompt:'If s ranks h first and h ranks s first, then s and h are matched in every stable matching.',type:'true-false',options:['True','False'],answer:'True',explanation:'Mutual first choices form a stable pair that must appear in every stable matching.'},
   {id:'24-tf-3',exam:'2024',section:'True or false',topic:'Minimum spanning trees',prompt:'If e is the unique minimum-weight edge, then e is in every minimum spanning tree.',type:'true-false',options:['True','False'],answer:'True',explanation:'The official solution identifies this as true.'},
@@ -107,3 +107,68 @@ export const questions: Question[] = [
   {id:'21-long-5',exam:'2021',section:'Graph search',topic:'Graph algorithms',prompt:'What algorithm is given as the conceptual solution to the graph bottleneck-path problem?',type:'multiple-choice',options:['Binary search on maximum steepness plus BFS','Dynamic programming in a grid','Bellman-Ford with negative edges','Greedy nearest-neighbor search'],answer:'Binary search on maximum steepness plus BFS',explanation:'The official solution can binary-search a threshold and BFS on allowed edges.'},
   {id:'21-long-6',exam:'2021',section:'Graph search',topic:'Graph algorithms',prompt:'What alternative bottleneck-edge method is proved using an MST in the 2021 solution?',type:'multiple-choice',options:['Find the MST and inspect the unique s-t path','Find the densest cut','Run all-pairs Dijkstra','Use a depth-first spanning forest'],answer:'Find the MST and inspect the unique s-t path',explanation:'The official alternative solution observes that the bottleneck edge is on the MST s-t path.'},
 ]
+
+const descriptions: Record<string, string> = {
+  '25-mc-1': 'Huffman frequency table:\nA = 22, B = 7, C = 51, D = 8, E = 1, F = 3, G = 8.',
+  '25-mc-2': 'Huffman frequency table:\nA = 22, B = 7, C = 51, D = 8, E = 1, F = 3, G = 8.\nConstruct the Huffman tree and use code lengths A: 2, C: 1, D: 4 as given by the smallest-frequency merge order.',
+  '25-mc-3': 'Huffman frequency table:\nA = 22, B = 7, C = 51, D = 8, E = 1, F = 3, G = 8.',
+  '25-mc-4': 'Use unrolling for T(n) = 3T(n/9) + √n.',
+  '25-mc-5': 'Given: an edge-weighted directed acyclic graph G and a source vertex s. Find the heaviest path starting at s and give the running time.',
+  '25-mc-6': 'Given G = (V, E, c), s, t, and a maximum flow f. A minimum s-t-cut is the set of edges whose sum of capacities is equal to the maximum flow.',
+  '25-mc-7': 'Directed flow network:\nV = {s, a, b, c, d, t}\nEdge capacities: sa: 5, ab: 2, ac: 3, bc: 4, bd: 5, cd: 1, dt: 3.',
+  '25-mc-8': 'G has m edges and distinguished vertices s and t. For every edge e, the transformed capacity is c′(e) = (m + 1)c(e) - 1. For a cut C:\ncap(C) = Σc(e), and cap′(C) = Σc′(e), over edges e in C.',
+  '25-long-1': 'Given an edge-weighted directed acyclic graph G and a source vertex s. Find the heaviest path starting at s and return only its total weight.',
+  '25-long-2': 'Given an edge-weighted directed acyclic graph G and source vertex s, compute single-source shortest paths. Unreachable vertices should have distance ∞.',
+  '25-long-3': 'G = (V, E, c) is a directed flow network with maximum s-t-flow F ≥ 1. Use max_flow as a black box and return a minimum s-t-cut.',
+  '25-long-4': 'Let f be a maximum flow for G = (V, E, c). Residual edge capacity for edge e is c(e) - f(e).',
+  '25-long-5': 'Directed flow network:\nV = {s, a, b, c, d, t}\nEdge capacities: sa: 5, ab: 2, ac: 3, bc: 4, bd: 5, cd: 1, dt: 3.',
+  '25-long-6': 'G is a directed network with integer capacities c(e) ≥ 1 and m = |E|. The transformed capacity is c′(e) = (m + 1)c(e) - 1.',
+
+  '24-mc-1': 'Given an undirected graph G. Give an algorithm that checks whether G has a cycle. For a connected component C with nC vertices and mC edges, cyclicity is tested by mC > nC - 1.',
+  '24-mc-2': 'Given a directed graph G. Give an algorithm that checks whether G has a cycle.',
+  '24-mc-3': 'Alarm problem: choose a maximum-sum subset of L with no two neighboring indices. Give a correct dynamic-programming algorithm.',
+  '24-mc-4': 'G is a directed graph whose vertices are labelled 1, ..., n, with every edge i → j satisfying i < j. Thus the vertex labels already give a topological ordering.',
+  '24-mc-5': 'G = (G, s, t, c) is a directed flow network with unit edge capacity. A set of vertex-disjoint s-t paths may share no internal vertex.',
+  '24-mc-6': 'Given an undirected graph G, a dominating set D satisfies D ⊆ V and every vertex v is in D or has a neighbor in D. The decision problem asks whether |D| ≤ k.',
+  '24-long-1': 'Given an undirected graph G = (V, E), give an algorithm that checks whether G has a cycle and analyse its running time.',
+  '24-long-2': 'Given a directed graph G = (V, E), give an algorithm that checks whether G has a cycle and analyse its running time.',
+  '24-long-3': 'Houses lie along a straight road at positions [0.0, 0.4, 0.6, 1.1, 2.6, 3.5, 4.0, 8.2, 8.5, 8.8]. Each antenna covers 4 km in each direction. The list is sorted.',
+  '24-long-4': 'Alarm problem: L = [1, 8, 2, 2, 8, 9, 4, 6]. The heaviest-first algorithm repeatedly picks a maximum element i, adds it, and writes zero to i - 1, i, and i + 1.',
+  '24-long-5': 'Alarm problem: L = [1, 8, 2, 2, 8, 9, 4, 6]. The even-odd algorithm sums elements at even indices and odd indices, then returns the larger sum.',
+  '24-long-6': 'For alarm list L, choose a maximum-sum subset with no adjacent items. The complete recurrence is c[i] = max(L[i - 1] + c[i - 2], c[i - 1]).',
+  '24-long-7': 'Given a directed graph G and vertices s and t, find as many vertex-disjoint s-t paths as possible. No internal vertex may occur in more than one path.',
+  '24-long-8': 'Given a directed graph G and vertices s and t, find as many vertex-disjoint s-t paths as possible. Let F be the running time of the max-flow subroutine.',
+  '24-long-9': 'Given an undirected graph G and integer k, decide whether G has a dominating set D of size at most k. A vertex v is dominated if v ∈ D or N(v) ∩ D is non-empty.',
+  '24-long-10': 'Prove Dominating Set NP-complete. For each edge uv of the original graph, the reduction adds a vertex wuv adjacent to u and v.',
+
+  '16-mc-1': 'Given strings x = x1...xn and y = y1...ym, dp(i,j) is the length of the longest common subsequence of the prefixes x1...xi and y1...yj.',
+  '16-mc-2': 'Given strings of lengths n and m, compute the length of their longest common subsequence.',
+  '16-mc-3': 'G is a directed acyclic graph with possible negative edge weights. Find shortest paths from source A to all vertices.',
+  '16-mc-4': 'G is a directed acyclic graph with n vertices and m edges. Compute shortest paths from a source with possible negative edge weights.',
+  '16-mc-5': 'Vertex Cover is NP-complete. In Independent Set, decide whether G has a set I of at least t pairwise nonadjacent vertices.',
+  '16-mc-6': 'Given graph G and integer t, decide whether G has a dominating set S of size at most t. A closed neighborhood N[v] must contain at least one vertex of S.',
+  '16-long-1': 'Given strings x = x1...xn and y = y1...ym, dp(i,j) is the LCS length for prefixes x1...xi and y1...yj.',
+  '16-long-2': 'Given strings x = x1...xn, y = y1...ym, and z = z1...zt, compute the length of their longest common subsequence.',
+  '16-long-3': 'G is a directed acyclic graph with integer edge weights, possibly negative. No negative-weight cycles are possible because G is a DAG.',
+  '16-long-4': 'G is a directed acyclic graph with n vertices and m edges. Compute shortest paths from one source vertex.',
+  '16-long-5': 'Vertex Cover is NP-complete. Independent Set asks whether G has at least t pairwise nonadjacent vertices.',
+  '16-long-6': 'Given graph G and integer t, decide whether G has a dominating set S of size at most t. For Vertex Cover reduction, add wuv adjacent to u and v for every edge uv.',
+
+  '21-mc-1': 'Solve T(n) = 2T(n/2) + O(n), assuming T(1) = 1.',
+  '21-mc-2': 'Solve T(n) = T(n/2) + 1, assuming T(1) = 1.',
+  '21-mc-3': 'Solve T(n) = 4T(n/2) + O(n), assuming T(1) = 1.',
+  '21-mc-4': 'Solve T(n) = 8T(n/2) + O(n²), assuming T(1) = 1.',
+  '21-mc-5': 'Solve T(n) = T(n - 1) + 2, assuming T(1) = 1.',
+  '21-mc-6': 'Solve T(n) = 2T(n - 1), assuming T(1) = 1.',
+  '21-long-1': 'alg1(data, i, j) splits the interval into halves. The base case has |i - j| ≤ 2 and the recursive calls are followed by return [min(a), max(b)].',
+  '21-long-2': 'alg2(data, i, j) splits the interval into halves and calls combine(a, b), which takes |j - i| log |j - i| time.',
+  '21-long-3': 'alg3(data, i, j) splits the interval into thirds and calls combine(a, b, c), which takes |j - i|² time.',
+  '21-long-4': 'Terrain is an n × n matrix of unique positive elevations. Border elevations are higher than every internal cell. A cell (i,j) is a local minimum if its four neighbors have larger elevations.',
+  '21-long-5': 'Given weighted graph G = (V,E,w), find paths from s to t and t to s that minimize the maximum absolute edge steepness |w(e)|.',
+  '21-long-6': 'Given weighted graph G = (V,E,w), find a path from s to t minimizing the largest absolute edge weight. An MST alternative considers the unique s-t path in the MST.',
+}
+
+export const questions: Question[] = baseQuestions.map((question) => ({
+  ...question,
+  description: descriptions[question.id],
+}))
